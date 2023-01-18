@@ -9,10 +9,17 @@ contract Token {
 
     // Track account balances
     mapping(address => uint) public balanceOf;
+    mapping(address => mapping(address => uint)) public allowance;
 
     event Transfer(
         address indexed _from,
         address indexed _to,
+        uint _value
+    );
+
+    event Approval(
+        address indexed _owner,
+        address indexed _spender,
         uint _value
     );
 
@@ -46,6 +53,19 @@ contract Token {
 
         emit Transfer(msg.sender, _to, _value);
 
+        return true;
+    }
+
+    function approve(address _spender, uint _value) public returns (bool success) {
+
+        require(
+            _spender != address(0),
+            "Approval of zero address is not permitted"
+        );
+
+        allowance[msg.sender][_spender] = _value;
+
+        emit Approval(msg.sender, _spender, _value);
         return true;
     }
 

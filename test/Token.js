@@ -7,7 +7,7 @@ const tokens = (n) => {
 
 describe("Token", () => {
 
-  let token, accounts, deployer, receiver
+  let token, accounts, deployer, receiver, decentralizedExchange
 
   beforeEach(async () => {
     const Token = await ethers.getContractFactory("Token")
@@ -16,6 +16,7 @@ describe("Token", () => {
     accounts = await ethers.getSigners()
     deployer = accounts[0]
     receiver = accounts[1]
+    decentralizedExchange = accounts[2]
   })
 
   describe("Deployment", () => {
@@ -87,6 +88,46 @@ describe("Token", () => {
       it("Rejects transfer if receiver is the zero address", async () => {
         const amount = tokens(10)
         await expect(token.connect(deployer).transfer("0x0000000000000000000000000000000000000000", amount)).to.be.revertedWith("Transferring to zero address is not permitted")
+      })
+
+    })
+
+    
+  
+  })
+
+  describe("Sending Tokens", () => {
+
+    let amount, transaction, receipt
+
+    beforeEach(async () => {
+      amount = tokens(100)
+      transaction = await token.connect(deployer).approve(decentralizedExchange.address, amount)
+      receipt = await transaction.wait()
+    })
+
+    describe("Successful Approvals", () => {
+  
+      it("Allocates an allowance for delegated token spending", async () => {
+        expect(await token.allowance(deployer.address, decentralizedExchange.address)).to.equal(amount)
+      })
+  
+      it("Emits an Approval event", async () => {
+        const event = receipt.events[0]
+        expect(event.event).to.equal("Approval")
+  
+        const args = event.args
+        expect(args._owner).to.equal(deployer.address)
+        expect(args._spender).to.equal(decentralizedExchange.address)
+        expect(args._value).to.equal(amount)
+      })
+
+    })
+
+    describe("Failing Approvals", () => {
+
+      it("Rejects approval if spender is the zero address", async () => {
+        await expect(token.connect(deployer).approve("0x0000000000000000000000000000000000000000", amount)).to.be.revertedWith("Approval of zero address is not permitted")
       })
 
     })
