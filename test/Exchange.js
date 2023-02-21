@@ -72,4 +72,42 @@ describe("Exchange", () => {
 
   })
 
+  describe("Withdrawing Tokens", () => {
+
+    let receipt
+    let amount = tokens(10)
+
+    beforeEach(async () => {
+      // Deposit tokens before withdrawing
+      // Approve tokens
+      await token1.connect(user1).approve(exchange.address, amount)
+      // Deposit tokens
+      await exchange.connect(user1).depositToken(token1.address, amount)
+
+      // Withdraw tokens
+      const transaction = await exchange.connect(user1).withdrawToken(token1.address, amount)
+      receipt = await transaction.wait()
+    })
+
+    it("Withdraws tokens", async () => {
+      // Ensure the tokens were transferred to the user
+      expect(await token1.balanceOf(exchange.address)).to.equal(0)
+      expect(await token1.balanceOf(user1.address)).to.equal(tokens(100))
+      // Ensure exchange keeps track of the withdrawal
+      expect(await exchange.balanceOf(token1.address, user1.address)).to.equal(0)
+    })
+
+    it("Emits a Withdraw event", async () => {
+      const event = receipt.events[1]
+      expect(event.event).to.equal("Withdraw")
+
+      const args = event.args
+      expect(args._token).to.equal(token1.address)
+      expect(args._user).to.equal(user1.address)
+      expect(args._amount).to.equal(amount)
+      expect(args._balance).to.equal(0)
+    })
+
+  })
+
 })

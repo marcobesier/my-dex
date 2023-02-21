@@ -16,6 +16,13 @@ contract Exchange {
         uint _balance
     );
 
+    event Withdraw(
+        address _token,
+        address _user,
+        uint _amount,
+        uint _balance
+    );
+
     constructor(address _feeAccount, uint _feePercent) {
         feeAccount = _feeAccount;
         feePercent = _feePercent;
@@ -26,6 +33,13 @@ contract Exchange {
         tokens[_token][msg.sender] = tokens[_token][msg.sender] + _amount;
 
         emit Deposit(_token, msg.sender, _amount, balanceOf(_token, msg.sender));
+    }
+
+    function withdrawToken(address _token, uint _amount) public {
+        Token(_token).transfer(msg.sender, _amount);
+        tokens[_token][msg.sender] = tokens[_token][msg.sender] - _amount;
+
+        emit Withdraw(_token, msg.sender, _amount, balanceOf(_token, msg.sender));
     }
 
     function balanceOf(address _token, address _user) public view returns (uint) {
