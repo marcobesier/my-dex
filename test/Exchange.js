@@ -6,7 +6,7 @@ const tokens = (n) => {
 }
 
 describe("Exchange", () => {
-  let deployer, feeAccount, exchange, token1, token2, user1
+  let deployer, feeAccount, exchange, token1, token2, user1, user2
 
   const feePercent = 10
 
@@ -15,6 +15,7 @@ describe("Exchange", () => {
     deployer = accounts[0]
     feeAccount = accounts[1]
     user1 = accounts[2]
+    user2 = accounts[3]
 
     const Exchange = await ethers.getContractFactory("Exchange")
     exchange = await Exchange.deploy(feeAccount.address, feePercent)
@@ -183,6 +184,70 @@ describe("Exchange", () => {
         await expect(exchange.connect(user1).makeOrder(token2.address, amount, token1.address, amount)).to.be.revertedWith("Insufficient balance")
       })
 
+    })
+
+  })
+
+  describe("Order Actions", () => {
+
+    let amount = tokens(1)
+
+    beforeEach(async () => {
+      // user1 deposits tokens
+      await token1.connect(user1).approve(exchange.address, amount)
+      await exchange.connect(user1).depositToken(token1.address, amount)
+      // user1 makes order
+      await exchange.connect(user1).makeOrder(token2.address, amount, token1.address, amount)
+    })
+
+    describe("Cancelling Orders", () => {
+
+      describe("Successful Cancellations", () => {
+        
+        let receipt
+
+        beforeEach(async () => {
+          // user1 cancels order
+          const transaction = await exchange.connect(user1).cancelOrder(1)
+          receipt = await transaction.wait()
+        })
+
+        it("Updates canceled orders", async () => {
+          expect(await exchange.orderCancelled(1)).to.equal(true)
+        })
+
+        it("Emits a Cancel event", async () => {
+          const event = receipt.events[0]
+          expect(event.event).to.equal("Cancel")
+    
+          const args = event.args
+          expect(args._id).to.equal(1)
+          expect(args._user).to.equal(user1.address)
+          expect(args._tokenGet).to.equal(token2.address)
+          expect(args._amountGet).to.equal(amount)
+          expect(args._tokenGive).to.equal(token1.address)
+          expect(args._amountGive).to.equal(amount)
+          expect(args._timestamp).to.be.at.least(1)
+        })
+      })
+
+      describe("Failing Cancellations", () => {
+
+        it("Rejects invalid order ids", async () => {
+          const invalidOrderId = 42
+          await expect(exchange.connect(user1).cancelOrder(invalidOrderId)).to.be.revertedWith("Invalid order id")
+        })
+
+        it("Rejects unauthorized cancellations", async () => {
+          await expect(exchange.connect(user2).cancelOrder(1)).to.be.revertedWith("You're not authorized to cancel this order")
+        })
+
+      })
+
+    })
+
+    describe("Filling Orders", () => {
+      // Tests for filling-order functionality will go here...
     })
 
   })

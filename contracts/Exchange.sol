@@ -22,6 +22,7 @@ contract Exchange {
 
     mapping(address => mapping(address => uint)) public tokens;
     mapping(uint => _Order) public orders;
+    mapping(uint => bool) public orderCancelled;
 
     event Deposit(
         address _token,
@@ -38,6 +39,16 @@ contract Exchange {
     );
 
     event Order(
+        uint _id,
+        address _user,
+        address _tokenGet,
+        uint _amountGet,
+        address _tokenGive,
+        uint _amountGive,
+        uint _timestamp
+    );
+
+    event Cancel(
         uint _id,
         address _user,
         address _tokenGet,
@@ -96,6 +107,35 @@ contract Exchange {
             _amountGet,
             _tokenGive,
             _amountGive,
+            block.timestamp
+        );
+    }
+
+    function cancelOrder(uint _id) public {
+        // Fetch order
+        _Order memory _order = orders[_id];
+
+        // Order must exist
+        require(
+            _order.id == _id,
+            "Invalid order id"
+        );
+
+        // Ensure the caller of the function is the owner of the order
+        require(
+            _order.user == msg.sender,
+            "You're not authorized to cancel this order"
+        );
+
+        orderCancelled[_id] = true;
+
+        emit Cancel(
+            _order.id,
+            msg.sender,
+            _order.tokenGet,
+            _order.amountGet,
+            _order.tokenGive,
+            _order.amountGive,
             block.timestamp
         );
     }
