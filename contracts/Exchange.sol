@@ -23,6 +23,7 @@ contract Exchange {
     mapping(address => mapping(address => uint)) public tokens;
     mapping(uint => _Order) public orders;
     mapping(uint => bool) public orderCancelled;
+    mapping(uint => bool) public orderFilled;
 
     event Deposit(
         address _token,
@@ -58,6 +59,17 @@ contract Exchange {
         uint _timestamp
     );
 
+    event Trade(
+        uint _id,
+        address _user,
+        address _tokenGet,
+        uint _amountGet,
+        address _tokenGive,
+        uint _amountGive,
+        address _creator,
+        uint _timestamp
+    );
+
     constructor(address _feeAccount, uint _feePercent) {
         feeAccount = _feeAccount;
         feePercent = _feePercent;
@@ -86,6 +98,11 @@ contract Exchange {
         require(
             balanceOf(_tokenGive, msg.sender) >= _amountGive,
             "Insufficient balance"
+        );
+
+        require(
+            _amountGet % 100 == 0,
+            "Invalid value for _amountGet. Must be multiple of 100."
         );
         
         orderCount = orderCount + 1;
@@ -139,4 +156,85 @@ contract Exchange {
             block.timestamp
         );
     }
+
+    function fillOrder(uint _id) public {
+        
+        // Fetch order
+        _Order memory _order = orders[_id];
+
+        // Order must exist
+        require(
+            _id > 0 && _id <= orderCount,
+            "Invalid order id"
+        );
+
+        // Order can't be already filled
+        require(
+            !orderFilled[_id],
+            "Order already filled"
+        );
+
+        // Order can't be cancelled
+        require(
+            !orderCancelled[_id],
+            "Can't fill cancelled order"
+        );
+
+        // Execute the trade
+        _trade(
+            _order.id,
+            _order.user,
+            _order.tokenGet,
+            _order.amountGet,
+            _order.tokenGive,
+            _order.amountGive
+        );
+
+        // Mark order as filled
+        orderFilled[_order.id] = true;
+    }
+
+    function _trade(
+        uint _orderId,
+        address _user,
+        address _tokenGet,
+        uint _amountGet,
+        address _tokenGive,
+        uint _amountGive
+    ) internal {
+        // Fee is paid by the user who filled the order (msg.sender)
+        // Fee is deduced from _amountGet
+        uint _feeAmount = _amountGet * feePercent / 100;
+
+        // User who fills the order must have sufficient balance
+        require(
+            balanceOf(_tokenGet, msg.sender) >= _amountGet + _feeAmount,
+            "Insufficient balance"
+        );
+
+        // Execute the trade
+        // msg.sender is the user who filled the order,
+        // while _user is the one who created the order.
+        tokens[_tokenGet][msg.sender] -= _amountGet + _feeAmount;
+        tokens[_tokenGet][_user] += _amountGet;
+
+        tokens[_tokenGive][msg.sender] += _amountGive;
+        tokens[_tokenGive][_user] -= _amountGive;
+
+        // Charge fees
+        tokens[_tokenGet][feeAccount] += _feeAmount;
+
+        // Emit trade event
+        emit Trade(
+            _orderId,
+            msg.sender,
+            _tokenGet,
+            _amountGet,
+            _tokenGive,
+            _amountGive,
+            _user,
+            block.timestamp
+        );
+    }
+
 }

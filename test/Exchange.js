@@ -184,6 +184,22 @@ describe("Exchange", () => {
         await expect(exchange.connect(user1).makeOrder(token2.address, amount, token1.address, amount)).to.be.revertedWith("Insufficient balance")
       })
 
+      it("Rejects if amount that user receives does not allow for a fee of integer type (in smallest denomination)", async () => {
+        // First, ensure user1 has another T1 token to trade, so that function doesn't revert with
+        // the "Insufficent balance" error.
+        await token1.connect(user1).approve(exchange.address, amount)
+        await exchange.connect(user1).depositToken(token1.address, amount)
+        
+        // _amountGet = 42 leads to _feeAmount = _amountGet * feePercent / 100 = 42 * 10 / 100 = 4.2
+        // Note that 4.2 is no longer of type uint and, therefore, an incorrect value for _feeAmount.
+        // 
+        // All the other examples, we used so far, work because
+        // _amountGet = amount = tokens(1) = 10^18 is a multiple of 100 = 10^2 and, therefore,
+        // leads to _feeAmount = _amountGet * feePercent / 100 = 10^18 * 10 / 100 = 10^17 * 100 / 100 = 10^17
+        // Note that 10^17 is a positive integer between 0 and 2^256 - 1 (i.e., of type uint) and, therefore, a valid value for _feeAmount.
+        await expect(exchange.connect(user1).makeOrder(token2.address, 42, token1.address, amount)).to.be.revertedWith("Invalid value for _amountGet. Must be multiple of 100.")
+      })
+
     })
 
   })
@@ -198,6 +214,12 @@ describe("Exchange", () => {
       await exchange.connect(user1).depositToken(token1.address, amount)
       // user1 makes order
       await exchange.connect(user1).makeOrder(token2.address, amount, token1.address, amount)
+
+      // deployer gives 100 T2 tokens to user 2
+      await token2.connect(deployer).transfer(user2.address, tokens(100))
+      // user2 deposits 2 T2 tokens 
+      await token2.connect(user2).approve(exchange.address, tokens(2))
+      await exchange.connect(user2).depositToken(token2.address, tokens(2))
     })
 
     describe("Cancelling Orders", () => {
@@ -247,7 +269,72 @@ describe("Exchange", () => {
     })
 
     describe("Filling Orders", () => {
-      // Tests for filling-order functionality will go here...
+      describe("Successful Trades", () => {
+
+        let receipt
+
+        beforeEach(async () => {
+          // user2 fills order
+          const transaction = await exchange.connect(user2).fillOrder(1)
+          receipt = await transaction.wait()
+        })
+
+        it("Executes the trade and charges fees", async () => {
+          // T1 (tokenGive)
+          expect(await exchange.balanceOf(token1.address, user1.address)).to.equal(tokens(0))
+          expect(await exchange.balanceOf(token1.address, user2.address)).to.equal(tokens(1))
+          expect(await exchange.balanceOf(token1.address, feeAccount.address)).to.equal(tokens(0))
+
+          // T2 (tokenGet)
+          expect(await exchange.balanceOf(token2.address, user1.address)).to.equal(tokens(1))
+          expect(await exchange.balanceOf(token2.address, user2.address)).to.equal(tokens(0.9))
+          expect(await exchange.balanceOf(token2.address, feeAccount.address)).to.equal(tokens(0.1))
+        })
+        
+        it("Updates filled orders", async () => {
+          expect(await exchange.orderFilled(1)).to.equal(true)
+        })
+        
+        it("Emits a Trade event", async () => {
+          const event = receipt.events[0]
+          expect(event.event).to.equal("Trade")
+    
+          const args = event.args
+          expect(args._id).to.equal(1)
+          expect(args._user).to.equal(user2.address)
+          expect(args._tokenGet).to.equal(token2.address)
+          expect(args._amountGet).to.equal(amount)
+          expect(args._tokenGive).to.equal(token1.address)
+          expect(args._amountGive).to.equal(amount)
+          expect(args._creator).to.equal(user1.address)
+          expect(args._timestamp).to.be.at.least(1)
+        })
+      
+      })
+      
+      describe("Failing Trades", () => {
+        it("Rejects invalid order ids", async () => {
+          const invalidOrderId = 42
+          await expect(exchange.connect(user2).fillOrder(invalidOrderId)).to.be.revertedWith("Invalid order id")
+        })
+
+        it("Rejects if user doesn't have enough funds to fill the order", async () => {
+          // user2 withdraws 1 T2
+          await exchange.connect(user2).withdrawToken(token2.address, tokens(1))
+          // user2 tries to fill the order, i.e., need 1.1 T2 but only has 1 T2 left on her account
+          await expect(exchange.connect(user2).fillOrder(1)).to.be.revertedWith("Insufficient balance")
+        })
+        
+        it("Rejects already filled orders", async () => {
+          await exchange.connect(user2).fillOrder(1)
+          await expect(exchange.connect(user2).fillOrder(1)).to.be.revertedWith("Order already filled")
+        })
+        
+        it("Rejects cancelled orders", async () => {
+          await exchange.connect(user1).cancelOrder(1)
+          await expect(exchange.connect(user2).fillOrder(1)).to.be.revertedWith("Can't fill cancelled order")
+        })
+      })
     })
 
   })
