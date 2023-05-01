@@ -9,6 +9,9 @@ import {
   loadExchange,
 } from '../store/interactions.js';
 
+import Navbar from './Navbar.js';
+import Markets from './Markets.js';
+
 function App() {
 
   const dispatch = useDispatch()
@@ -19,7 +22,15 @@ function App() {
     const provider = loadProvider(dispatch)
     const chainId = await loadNetwork(provider, dispatch)
 
-    await loadAccount(provider, dispatch)
+    // Reload page when network changes
+    window.ethereum.on('chainChanged', () => {
+      window.location.reload()
+    })
+
+    // Fetch account and balance from MetaMask if they're changed
+    window.ethereum.on('accountsChanged', async () => {
+      await loadAccount(provider, dispatch)
+    })
 
     // Token smart contract
     const MT = config[chainId].MT.address
@@ -39,12 +50,12 @@ function App() {
     <div className="App">
       <div>
         
-        {/* Navbar */}
+        <Navbar />
 
         <main className='exchange grid'>
           <section className='exchange__section--left grid'>
 
-            {/* Markets */}
+            <Markets />
 
             {/* Balance */}
 
