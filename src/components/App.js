@@ -7,10 +7,12 @@ import {
   loadAccount,
   loadTokens,
   loadExchange,
+  subscribeToEvents
 } from '../store/interactions.js';
 
 import Navbar from './Navbar.js';
 import Markets from './Markets.js';
+import Balance from './Balance.js';
 
 function App() {
 
@@ -37,9 +39,12 @@ function App() {
     const mETH = config[chainId].mETH.address
     await loadTokens(provider, [MT, mETH], dispatch)
 
-    // Echange contract
-    const exchange = config[chainId].exchange.address
-    await loadExchange(provider, exchange, dispatch)
+    // Exchange contract
+    const exchangeAddress = config[chainId].exchange.address
+    const exchange = await loadExchange(provider, exchangeAddress, dispatch)
+
+    // Listen to events
+    subscribeToEvents(exchange, dispatch)
   }
 
   useEffect(() => {
@@ -57,7 +62,7 @@ function App() {
 
             <Markets />
 
-            {/* Balance */}
+            <Balance />
 
             {/* Order */}
 
