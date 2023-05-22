@@ -7,13 +7,15 @@ import {
   loadAccount,
   loadTokens,
   loadExchange,
-  subscribeToEvents
+  subscribeToEvents,
+  loadAllOrders
 } from '../store/interactions.js';
 
 import Navbar from './Navbar.js';
 import Markets from './Markets.js';
 import Balance from './Balance.js';
 import Order from './Order.js';
+import OrderBook from './OrderBook.js';
 
 function App() {
 
@@ -43,6 +45,9 @@ function App() {
     // Exchange contract
     const exchangeAddress = config[chainId].exchange.address
     const exchange = await loadExchange(provider, exchangeAddress, dispatch)
+
+    // Fetch all orders: open, filled, cancelled
+    loadAllOrders(provider, exchange, dispatch)
 
     // Listen to events
     subscribeToEvents(exchange, dispatch)
@@ -76,7 +81,7 @@ function App() {
 
             {/* Trades */}
 
-            {/* OrderBook */}
+            <OrderBook />
 
           </section>
         </main>
