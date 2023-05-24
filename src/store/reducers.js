@@ -249,6 +249,52 @@ export const exchange = (state = DEFAULT_EXCHANGE_STATE, action) => {
         }
       }
 
+    case 'ORDER_FILL_REQUEST':
+      return {
+        ...state,
+        transaction: {
+          transactionType: 'Fill Order',
+          isPending: true,
+          isSuccessful: false
+        }
+      }
+
+    case 'ORDER_FILL_SUCCESS':
+      // Prevent duplicate orders
+      // Detect whether order already exists in allOrders by checking the id
+      index = state.filledOrders.data.findIndex(order => order._id.toString() === action.order._id.toString())
+      // If no elements satisfy the testing function of findIndex, -1 is returned
+      if(index === -1) {
+        data = [...state.filledOrders.data, action.order]
+      } else {
+        data = state.filledOrders.data
+      }
+
+      return {
+        ...state,
+        transaction: {
+          transactionType: 'Fill Order',
+          isPending: false,
+          isSuccessful: true
+        },
+        filledOrders: {
+          ...state.filledOrders,
+          data
+        },
+        events: [action.event, ...state.events]
+      }
+
+    case 'ORDER_FILL_FAIL':
+      return {
+        ...state,
+        transaction: {
+          transactionType: 'Fill Order',
+          isPending: false,
+          isSuccessful: false,
+          isError: true
+        }
+      }
+
     default:
       return state
   }
