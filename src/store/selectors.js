@@ -3,6 +3,7 @@ import { get, groupBy, reject, minBy, maxBy } from "lodash";
 import { ethers } from "ethers";
 import moment from "moment";
 
+const events = state => get(state, "exchange.events")
 const tokens = state => get(state, "tokens.contracts")
 const account = state => get(state, "provider.account")
 const allOrders = state => get(state, "exchange.allOrders.data", [])
@@ -326,3 +327,12 @@ const decorateMyFilledOrder = (order, account, tokens) => {
     _orderSign: orderType === "buy" ? "+" : "-"
   })
 }
+
+export const myEventsSelector = createSelector(
+  account,
+  events,
+  (account, events) => {
+    events = events.filter((e) => e.args._user === account)
+    return events
+  }
+)
